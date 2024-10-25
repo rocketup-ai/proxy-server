@@ -1,5 +1,5 @@
-# Use a lightweight base image
-FROM debian:bullseye-slim
+# Use a lightweight base image with OpenSSL 3
+FROM debian:bookworm-slim
 
 # Install necessary dependencies
 RUN apt-get update && apt-get install -y \
@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     libkrb5-dev \
     libdb-dev \
     libnetfilter-conntrack-dev \
+    libcppunit-dev \
+    libldap2-dev \
+    libpam0g-dev \
     perl \
     pkg-config \
     ca-certificates \
@@ -27,7 +30,7 @@ RUN wget http://www.squid-cache.org/Versions/v6/squid-$SQUID_VERSION.tar.gz && \
     tar xzf squid-$SQUID_VERSION.tar.gz && \
     cd squid-$SQUID_VERSION && \
     ./configure --prefix=/usr/local/squid \
-                --enable-ssl \
+                --with-openssl \
                 --enable-ssl-crtd \
                 --disable-cache-digests \
                 --disable-icmp \
@@ -35,12 +38,11 @@ RUN wget http://www.squid-cache.org/Versions/v6/squid-$SQUID_VERSION.tar.gz && \
                 --disable-wccpv2 \
                 --disable-snmp \
                 --enable-auth \
-                --with-openssl \
                 --enable-basic-auth-helpers=NCSA \
                 --disable-cache \
                 --enable-forward-log \
                 --enable-follow-x-forwarded-for && \
-    make && make install && \
+    make -j$(nproc) && make install && \
     cd .. && rm -rf squid-$SQUID_VERSION*
 
 # Create necessary directories
