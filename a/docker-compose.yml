@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  squid-proxy:
+    build: .
+    container_name: squid-proxy
+    ports:
+      - "3128:3128"  # HTTP
+      - "3129:3129"  # HTTPS
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf
+      - ./ssl_cert:/etc/squid/ssl_cert
+    restart: always
