@@ -1,49 +1,12 @@
-# Use a lightweight base image with OpenSSL 3
-FROM debian:bookworm-slim
+# Use Ubuntu 23.10 as the base image
+FROM ubuntu:23.10
 
-# Install necessary dependencies
+# Install necessary packages
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    wget \
-    libssl-dev \
-    libexpat1-dev \
-    libpcre2-dev \
-    libcap2-dev \
-    libkrb5-dev \
-    libdb-dev \
-    libnetfilter-conntrack-dev \
-    libcppunit-dev \
-    libldap2-dev \
-    libpam0g-dev \
-    perl \
-    pkg-config \
-    ca-certificates \
+    squid \
     openssl \
-    apache2-utils && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set Squid version
-ENV SQUID_VERSION 6.1
-
-# Download and build Squid
-RUN wget http://www.squid-cache.org/Versions/v6/squid-$SQUID_VERSION.tar.gz && \
-    tar xzf squid-$SQUID_VERSION.tar.gz && \
-    cd squid-$SQUID_VERSION && \
-    ./configure --prefix=/usr/local/squid \
-                --with-openssl \
-                --enable-ssl-crtd \
-                --disable-cache-digests \
-                --disable-icmp \
-                --disable-wccp \
-                --disable-wccpv2 \
-                --disable-snmp \
-                --enable-auth \
-                --enable-basic-auth-helpers=NCSA \
-                --disable-cache \
-                --enable-forward-log \
-                --enable-follow-x-forwarded-for && \
-    make -j$(nproc) && make install && \
-    cd .. && rm -rf squid-$SQUID_VERSION*
+    apache2-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories
 RUN mkdir -p /etc/squid/ssl_cert /etc/squid
@@ -54,17 +17,20 @@ RUN openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
     -keyout /etc/squid/ssl_cert/mykey.pem \
     -out /etc/squid/ssl_cert/mycert.pem
 
+# Set permissions for the SSL certificate
+RUN chown proxy:proxy /etc/squid/ssl_cert/mykey.pem /etc/squid/ssl_cert/mycert.pem
+RUN chmod 600 /etc/squid/ssl_cert/mykey.pem /etc/squid/ssl_cert/mycert.pem
+
 # Create an authentication password file
 RUN htpasswd -cb /etc/squid/passwords user1 password1
+RUN chown proxy:proxy /etc/squid/passwords
+RUN chmod 640 /etc/squid/passwords
 
 # Copy the Squid configuration file
-COPY squid.conf /usr/local/squid/etc/squid.conf
-
-# Initialize Squid cache directories
-RUN /usr/local/squid/sbin/squid -Nz
+COPY squid.conf /etc/squid/squid.conf
 
 # Expose the HTTPS port
 EXPOSE 3128
 
 # Start Squid when the container launches
-CMD ["/usr/local/squid/sbin/squid", "-NYCd", "1"]
+CMD ["squid", "-N", "-f", "/etc/squid/squid.conf"]
